@@ -342,9 +342,9 @@ def train(args, loader, generator, discriminator, extra, g_optim, d_optim, e_opt
             _, mean_source_feats = g_source([mean_source_latent], input_is_latent=True, return_feats=True)
         _, target_feats = generator([z], return_feats=True)
         _, mean_target_feats = generator([mean_target_latent], input_is_latent=True, return_feats=True)
-        f1 = [] # source content, source style
-        f2 = [] # source content, target style
-        f3 = [] # target content, target style
+        f1 = [] # source invariant, source specific
+        f2 = [] # source invariant, target specific
+        f3 = [] # target invariant, target specific
         for source_feat, target_feat, mean_source_feat, mean_target_feat in zip(source_feats, target_feats, mean_source_feats, mean_target_feats):
             f1.append(adaptive_instance_normalization(source_feat, mean_source_feat.repeat(4, 1, 1, 1)))
             f2.append(adaptive_instance_normalization(source_feat, mean_target_feat.repeat(4, 1, 1, 1)))
@@ -352,15 +352,15 @@ def train(args, loader, generator, discriminator, extra, g_optim, d_optim, e_opt
             
         num_layers = len(f1)
             
-        style_loss = 0
-        content_loss = 0
+        specific_loss = 0
+        invariant_loss = 0
         for l in range(num_layers):
-            style_loss = style_loss + (1 - F.cosine_similarity(f1[l].view(4, -1), f2[l].view(4, -1), dim=1)).mean()
-            content_loss = content_loss + (1 - F.cosine_similarity(f2[l].view(4, -1), f3[l].view(4, -1), dim=1)).mean()
-        style_loss = style_loss / num_layers
-        content_loss = content_loss / num_layers
+            specific_loss = specific_loss + (1 - F.cosine_similarity(f1[l].view(4, -1), f2[l].view(4, -1), dim=1)).mean()
+            invariant__loss = invariant__loss + (1 - F.cosine_similarity(f2[l].view(4, -1), f3[l].view(4, -1), dim=1)).mean()
+        specific_loss = specific_loss / num_layers
+        invariant__loss = invariant__loss / num_layers
             
-        new_loss_g = args.lambda_style * style_loss + args.lambda_content * content_loss
+        new_loss_g = args.lambda_specific * specific_loss + args.lambda_invariant * invariant_loss
             
 
         g_loss = g_loss + new_loss_g
@@ -573,8 +573,8 @@ if __name__ == "__main__":
     parser.add_argument('--lambda_contrast', type=float, default=0.001)
     parser.add_argument('--source_latent', type=str, default=None)
     parser.add_argument('--truncation', type=float, default=1)
-    parser.add_argument('--lambda_style', type=float, default=1)
-    parser.add_argument('--lambda_content', type=float, default=1)
+    parser.add_argument('--lambda_specific', type=float, default=1)
+    parser.add_argument('--lambda_invariant', type=float, default=1)
 
     args = parser.parse_args()
     if args.data_path[-1] == '/':
